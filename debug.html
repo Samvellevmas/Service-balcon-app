@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Диагностика</title>
+<style>
+body{font-family:monospace;padding:14px;font-size:13px;background:#fff;color:#111;line-height:1.5;margin:0}
+h2{font-size:16px;margin:0 0 12px}
+.box{padding:10px;border-radius:8px;margin-bottom:8px;white-space:pre-wrap;word-break:break-all}
+.info{background:#f3f4f6}
+.ok{background:#dcfce7;color:#166534}
+.err{background:#fee2e2;color:#991b1b;font-weight:600}
+</style>
+</head>
+<body>
+<h2>🔍 Диагностика приложения</h2>
+<div id="out"></div>
+<script>
+function box(cls,title,text){
+  var d=document.createElement('div');
+  d.className='box '+cls;
+  d.textContent=title+(text?('\n'+text):'');
+  document.getElementById('out').appendChild(d);
+}
+box('info','Шаг 1','Проверяю localStorage…');
+
+try{
+  var KEY='balcony_finance_v2';
+  var raw=localStorage.getItem(KEY);
+  if(!raw){
+    box('err','❌ Данных нет','localStorage пуст. Данные не найдены.');
+  }else{
+    box('ok','✅ Данные в localStorage','Размер: '+raw.length+' символов');
+    try{
+      var d=JSON.parse(raw);
+      box('ok','✅ JSON корректный',
+        'Объектов: '+(d.objects?d.objects.length:0)+
+        '\nОпераций: '+(d.ops?d.ops.length:0)+
+        '\nПередач: '+(d.transfers?d.transfers.length:0)+
+        '\nПартнёров: '+(d.partners?d.partners.length:0)+
+        '\nКатегорий: '+(d.categories?d.categories.length:0)+
+        '\n_deleted: '+(d._deleted?'есть':'нет'));
+      try{
+        var dd=JSON.parse(JSON.stringify(d));
+        if(!dd._deleted)dd._deleted={partners:[],categories:[],objects:[],ops:[],transfers:[]};
+        var keys=['partners','categories','objects','ops','transfers'];
+        for(var i=0;i<keys.length;i++)if(!Array.isArray(dd._deleted[keys[i]]))dd._deleted[keys[i]]=[];
+        for(var j=0;j<keys.length;j++)if(!Array.isArray(dd[keys[j]]))dd[keys[j]]=[];
+        [].concat(dd.objects,dd.ops,dd.transfers).forEach(function(x){
+          if(!x||typeof x!=='object')throw new Error('Некорректный элемент: '+JSON.stringify(x));
+          if(!x.updatedAt&&x.createdAt)x.updatedAt=x.createdAt;
+        });
+        box('ok','✅ Миграция проходит без ошибок','');
+      }catch(me){
+        box('err','❌ Миграция падает',me.message);
+      }
+    }catch(pe){
+      box('err','❌ JSON не парсится',pe.message);
+    }
+  }
+
+  var sync=localStorage.getItem('balcony_sync_v1');
+  if(sync){
+    try{
+      var s=JSON.parse(sync);
+      box('ok','✅ Настройки синхронизации есть',
+        'Владелец: '+(s.owner||'—')+
+        '\nРепозиторий: '+(s.repo||'—')+
+        '\nТокен: '+(s.token?'есть ('+s.token.slice(0,14)+'…)' :'нет')+
+        '\nПоследняя синхронизация: '+(s.lastSync?new Date(s.lastSync).toLocaleString('ru-RU'):'никогда'));
+    }catch(e){
+      box('err','❌ Настройки синхронизации битые',e.message);
+    }
+  }else{
+    box('info','Настройки синхронизации','Не найдены');
+  }
+
+  box('ok','✅ Диагностика завершена','Пришлите скриншот разработчику');
+}catch(e){
+  box('err','❌ Неожиданная ошибка',e.message+'\n\n'+(e.stack||''));
+}
+</script>
+</body></html>
